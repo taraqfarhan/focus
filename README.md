@@ -7,17 +7,9 @@ Temporarily blocks distracting apps and websites in the background.
 ```
 Usage: focus [commands] [duration]
        focus [blocklist commands] <App Name | Website URL>
-
-  focus add "safari"
-  focus remove "safari"
-  focus add-site "reddit.com"
-  focus remove-site "reddit.com"
-
-  focus start 1h
-  focus stop
-  focus status
-  focus list
-  focus -h | --help
+       
+       App Names should match the name of the app as it appears in the mac's Applications folder.
+       And Website URLs should be in the format of "example.com" (without "https://").
 
 Commands:
   add <App>             Add an app to the blocklist
@@ -40,8 +32,8 @@ Examples:
   # Add YouTube to the website blocklist
   focus add-site "youtube.com"
 
-  # Add Discord to the app blocklist
-  focus add "Discord"
+  # Add Google Chrome to the app blocklist
+  focus add "Google Chrome"
 
   # Start a focus session for 45 minutes
   # Note: sudo is required if you have websites in your blocklist
@@ -78,15 +70,3 @@ Examples:
    To query and control applications, macOS may request permissions.
    - Open **System Settings > Privacy & Security > Accessibility**.
    - Ensure your terminal application (e.g., Terminal, iTerm2, VS Code) is enabled in the list.
-
-5. **Website Blocking & Sudo Access**:
-   Modifying website blocklists edits `/etc/hosts` to route traffic to `127.0.0.1`.
-   - Modifying `/etc/hosts` requires root privileges.
-   - When launching a session that blocks websites, run with `sudo`:
-     ```bash
-     sudo focus start <duration>
-     ```
-     To stop a session that blocks websites:
-     ```bash
-     sudo focus stop
-     ```

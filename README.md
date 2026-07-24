@@ -9,7 +9,10 @@ Usage: focus [commands] [duration]
        focus [blocklist commands] <App Name | Website URL>
        
        App Names should match the name of the app as it appears in the mac's Applications folder.
+       So, App Names are Case Sensitive (It's WhatsApp, not Whatsapp)
+
        And Website URLs should be in the format of "example.com" (without "https://").
+
 
 Commands:
   add <App>             Add an app to the blocklist
@@ -34,6 +37,9 @@ Examples:
 
   # Add Google Chrome to the app blocklist
   focus add "Google Chrome"
+
+  # Add WhatsApp to the app blocklist
+  focus add "WhatsApp"    # It's WhatsApp, not Whatsapp (Whatsapp won't work)
 
   # Start a focus session for 45 minutes
   # Note: sudo is required if you have websites in your blocklist

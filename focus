@@ -26,6 +26,12 @@ focus: block distracting apps and websites on macos
 usage: focus [commands] [duration]
        focus [blocklist commands] <App Name | Website URL>
 
+       App Names should match the name of the app as it appears in the mac's Applications folder.
+       So, App Names are Case Sensitive (It's WhatsApp, not Whatsapp)
+
+       And Website URLs should be in the format of "example.com" (without "https://").
+
+
 duration options:             10 (10 seconds), 10s (seconds), 2m (minutes), 5h (hours)
 
 Commands:
@@ -37,8 +43,8 @@ Commands:
 Blocklist Management:
   add "App Name"              add an app to the blocklist
   remove "App Name"           remove an app from the blocklist
-  add-site "Website URL"              add a website to the blocklist
-  remove-site "Website URL"           remove a website from the blocklist
+  add-site "Website URL"      add a website to the blocklist
+  remove-site "Website URL"   remove a website from the blocklist
 
 Options:
   -h, --help                  show this help message and exit
@@ -114,13 +120,12 @@ def get_running_apps():
         return []
 
 
-def hide_app(app_name):
-    script = f'''
-    try
-        tell application "System Events" to set visible of process "{app_name}" to false
-    end try
-    '''
-    subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+def kill_app(app_name):
+    """
+    Forcefully terminates the application to prevent it from running.
+    Uses killall -9 to send SIGKILL, ensuring the app closes immediately.
+    """
+    subprocess.run(['killall', '-9', app_name], capture_output=True, text=True)
 
 
 # --- Hosts File & DNS Management ---
@@ -242,7 +247,7 @@ def check_and_restart_browsers(sites):
 # --- Daemon Logic ---
 
 def run_daemon(end_time_str, apps_str, sites_str):
-    """Runs in the background. Hides apps until time expires, then restores hosts."""
+    """Runs in the background. Kills apps until time expires, then restores hosts."""
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
@@ -261,8 +266,8 @@ def run_daemon(end_time_str, apps_str, sites_str):
         running_apps = get_running_apps()
         for app in app_list:
             if app in running_apps:
-                hide_app(app)
-        time.sleep(0.5)
+                kill_app(app)
+        time.sleep(0.2)  # Checks more frequently to kill the app instantly
 
     # Time's up: restore websites and clean up
     if site_list:
@@ -405,7 +410,7 @@ def handle_status(args):
             clear_state()
             print("  Cleaned up state file.")
         sys.exit(0)
-        
+
     except PermissionError:
         # The process is running as root, so we can't signal it.
         # But it IS alive!
@@ -420,7 +425,7 @@ def handle_status(args):
     mins, secs = divmod(int(remaining), 60)
     hours, mins = divmod(mins, 60)
     time_str = f"{hours}h {mins}m {secs}s" if hours > 0 else f"{mins}m {secs}s"
-    
+
     print(f"  Focus session active.")
     print(f"  Time remaining: {time_str}")
     if state["apps"]:

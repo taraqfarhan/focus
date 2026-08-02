@@ -2,11 +2,13 @@
 import argparse
 import json
 import os
+import random
+import re
+import signal
+import string
 import subprocess
 import sys
 import time
-import re
-import signal
 
 # --- Directory & File Path Setup ---
 CONFIG_DIR = os.path.expanduser("~/.config/focus")
@@ -35,7 +37,7 @@ usage: focus [commands] [duration]
 duration options:             10 (10 seconds), 10s (seconds), 2m (minutes), 5h (hours)
 
 Commands:
-  start <duration>            start the focus session (sudo required for websites)
+  start [--hard <numofchars>] <duration> start the focus session (sudo required for websites)
   stop                        stop the active focus session (sudo required for websites)
   status                      check the status of the active focus session
   list                        list blocked apps and sites
@@ -47,6 +49,7 @@ Blocklist Management:
   remove-site "Website URL"   remove a website from the blocklist
 
 Options:
+  --hard <numofchars>         require typing a random string to stop early
   -h, --help                  show this help message and exit
 """
 
@@ -70,8 +73,8 @@ def save_config(config):
         json.dump(config, f, indent=4)
 
 
-def save_state(pid, end_time, apps, sites):
-    state = {"pid": pid, "end_time": end_time, "apps": apps, "sites": sites}
+def save_state(pid, end_time, apps, sites, hard=0):
+    state = {"pid": pid, "end_time": end_time, "apps": apps, "sites": sites, "hard": hard}
     with open(STATE_PATH, 'w') as f:
         json.dump(state, f)
 
@@ -313,6 +316,11 @@ def handle_start(args):
         print("  Please run with sudo: sudo focus start <duration>")
         sys.exit(1)
 
+    hard_chars = getattr(args, 'hard', 0) or 0
+    if hard_chars < 0:
+        print("  Error: --hard must be a positive integer.")
+        sys.exit(1)
+
     try:
         duration_secs = parse_duration(args.duration)
     except ValueError as e:
@@ -349,9 +357,11 @@ def handle_start(args):
     )
 
     # Save state with the daemon's PID
-    save_state(proc.pid, end_time, config["apps"], config["sites"])
+    save_state(proc.pid, end_time, config["apps"], config["sites"], hard=hard_chars)
 
     print(f"\n  Focus session started in background for {args.duration} ({duration_secs} seconds).")
+    if hard_chars > 0:
+        print(f"  Hard Mode: Enabled ({hard_chars} chars required to stop early)")
     if config["apps"]:
         print(f"  Blocking Apps: {', '.join(config['apps'])}")
     if config["sites"]:
@@ -371,6 +381,22 @@ def handle_stop(args):
         print("  Error: This session is blocking websites, which requires modifying /etc/hosts.")
         print("  Please stop it with: sudo focus stop")
         sys.exit(1)
+
+    hard_chars = state.get("hard", 0)
+    if hard_chars > 0:
+        chars = string.ascii_letters + string.digits
+        random_str = ''.join(random.choice(chars) for _ in range(hard_chars))
+        print(f"  Hard Mode Active! To stop early, enter the following {hard_chars}-character string:\n")
+        print(f"  {random_str}\n")
+        try:
+            user_input = input("  Enter string: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\n  Cancelled. Focus session continues.")
+            sys.exit(1)
+
+        if user_input != random_str:
+            print("  Error: String mismatch. Focus session cannot be stopped early.")
+            sys.exit(1)
 
     try:
         os.kill(state["pid"], signal.SIGTERM)
@@ -428,6 +454,8 @@ def handle_status(args):
 
     print(f"  Focus session active.")
     print(f"  Time remaining: {time_str}")
+    if state.get("hard"):
+        print(f"  Hard Mode: Enabled ({state['hard']} chars required to stop early)")
     if state["apps"]:
         print(f"  Blocking Apps: {', '.join(state['apps'])}")
     if state["sites"]:
@@ -464,6 +492,7 @@ def main():
     subparsers.add_parser("list", add_help=False)
 
     parser_start = subparsers.add_parser("start", add_help=False)
+    parser_start.add_argument("--hard", type=int, default=0)
     parser_start.add_argument("duration", type=str)
 
     subparsers.add_parser("stop", add_help=False)

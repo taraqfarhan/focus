@@ -5,7 +5,7 @@ Temporarily blocks distracting apps and websites in the background.
 
 ## Overview
 ```
-Usage: focus [commands] [duration]
+Usage: focus [commands] [duration] [--hard <numofchars>]
        focus [blocklist commands] <App Name | Website URL>
        
        App Names should match the name of the app as it appears in the mac's Applications folder.
@@ -15,15 +15,18 @@ Usage: focus [commands] [duration]
 
 
 Commands:
-  add <App>             Add an app to the blocklist
-  remove <App>          Remove an app from the blocklist
-  add-site <URL>        Add a website to the blocklist
-  remove-site <URL>     Remove a website from the blocklist
-  start <duration>      Start the focus session (sudo required for website blocking)
-  stop                  Stop the active focus session (sudo required for website blocking)
-  status                Check the status of the active focus session
-  list                  List blocked apps and sites
-  -h | --help           Show help message
+  start [--hard <n>] <dur>   Start the focus session (sudo required for website blocking)
+  stop                       Stop the active focus session (sudo required for website blocking)
+  status                     Check the status of the active focus session
+  list                       List blocked apps and sites
+  add <App>                  Add an app to the blocklist
+  remove <App>               Remove an app from the blocklist
+  add-site <URL>             Add a website to the blocklist
+  remove-site <URL>          Remove a website from the blocklist
+
+Options:
+  --hard <numofchars>        Require typing a random string of <numofchars> to stop early
+  -h | --help                Show help message
 
 Duration formats:
   5      (5 seconds)
@@ -44,6 +47,9 @@ Examples:
   # Start a focus session for 45 minutes
   # Note: sudo is required if you have websites in your blocklist
   sudo focus start 45m
+
+  # Start a hard focus session for 1 hour (requires typing a 100-char random string to stop early)
+  sudo focus start --hard 100 1h
 
   # Check session status
   focus status

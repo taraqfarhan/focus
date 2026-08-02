@@ -5,7 +5,7 @@ Temporarily blocks distracting apps and websites in the background.
 
 ## Overview
 ```
-Usage: focus [commands] [duration] [--hard <numofchars>]
+Usage: focus [commands] [options] [duration]
        focus [blocklist commands] <App Name | Website URL>
        
        App Names should match the name of the app as it appears in the mac's Applications folder.
@@ -25,7 +25,7 @@ Commands:
   remove-site <URL>          Remove a website from the blocklist
 
 Options:
-  --hard <numofchars>        Require typing a random string of <numofchars> to stop early
+  --hard <num-of-chars>      Require typing random chars to stop early
   -h | --help                Show help message
 
 Duration formats:
@@ -48,7 +48,7 @@ Examples:
   # Note: sudo is required if you have websites in your blocklist
   sudo focus start 45m
 
-  # Start a hard focus session for 1 hour (requires typing a 100-char random string to stop early)
+  # Start a hard focus session for 1 hour (requires typing 100 random chars to stop early)
   sudo focus start --hard 100 1h
 
   # Check session status

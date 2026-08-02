@@ -25,7 +25,7 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 CUSTOM_HELP = """
 focus: block distracting apps and websites on macos
 
-usage: focus [commands] [duration]
+usage: focus [commands] [options] [duration]
        focus [blocklist commands] <App Name | Website URL>
 
        App Names should match the name of the app as it appears in the mac's Applications folder.
@@ -49,7 +49,7 @@ Blocklist Management:
   remove-site "Website URL"   remove a website from the blocklist
 
 Options:
-  --hard <num-of-chars>       require typing a random string to stop early
+  --hard <num-of-chars>       require typing random chars to stop early
   -h, --help                  show this help message and exit
 """
 
@@ -417,17 +417,17 @@ def handle_stop(args):
     hard_chars = state.get("hard", 0)
     if hard_chars > 0:
         chars = string.ascii_letters + string.digits
-        random_str = ''.join(random.choice(chars) for _ in range(hard_chars))
-        print(f"  Hard Mode Active! To stop early, enter the following {hard_chars}-character string:\n")
-        print(f"  {random_str}\n")
+        print(f"  Hard Mode Active! To stop early, enter the exact char you see in each iteration (total: {hard_chars} chars)\n")
         try:
-            user_input = input("  Enter string: ").strip()
+            for i in range(hard_chars):
+                random_char = random.choice(chars)
+                print(" ", i + 1, random_char, end="\b")
+                user_char = input()
+                if user_char != random_char:
+                    print("  Error: char mismatch. Focus session cannot be stopped early.")
+                    sys.exit(1)
         except (KeyboardInterrupt, EOFError):
             print("\n  Cancelled. Focus session continues.")
-            sys.exit(1)
-
-        if user_input != random_str:
-            print("  Error: String mismatch. Focus session cannot be stopped early.")
             sys.exit(1)
 
     try:

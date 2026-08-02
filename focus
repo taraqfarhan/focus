@@ -37,10 +37,10 @@ usage: focus [commands] [duration]
 duration options:             10 (10 seconds), 10s (seconds), 2m (minutes), 5h (hours)
 
 Commands:
-  start [--hard <numofchars>] <duration> start the focus session (sudo required for websites)
-  stop                        stop the active focus session (sudo required for websites)
-  status                      check the status of the active focus session
-  list                        list blocked apps and sites
+  start [--hard <num>] <duration>   start the focus session (sudo required for websites)
+  stop                              stop the active focus session (sudo required for websites)
+  status                            check the status of the active focus session
+  list                              list blocked apps and sites
 
 Blocklist Management:
   add "App Name"              add an app to the blocklist
@@ -49,7 +49,7 @@ Blocklist Management:
   remove-site "Website URL"   remove a website from the blocklist
 
 Options:
-  --hard <numofchars>         require typing a random string to stop early
+  --hard <num-of-chars>       require typing a random string to stop early
   -h, --help                  show this help message and exit
 """
 
@@ -115,12 +115,44 @@ def parse_duration(duration_str):
 # --- macOS Interfacing ---
 
 def get_running_apps():
-    script = 'tell application "System Events" to get name of every application process'
+    """
+    Retrieves currently running GUI application names using ps and lsappinfo.
+    Avoids querying macOS 'System Events' via AppleScript, which causes IPC lockups
+    and interferes with background accessibility apps like rcmd, Raycast, and Alfred.
+    """
+    apps = set()
     try:
-        result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, check=True)
-        return [app.strip() for app in result.stdout.split(',')]
-    except subprocess.CalledProcessError:
-        return []
+        res = subprocess.run(["ps", "-ax", "-o", "comm="], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            line = line.strip()
+            if not line or ".appex/" in line or ".xpc/" in line:
+                continue
+            # Match main application bundles in /Applications or /System/Applications
+            m = re.search(r"/(?:Applications|System/Applications)/([^/]+)\.app/Contents/MacOS/", line)
+            if m:
+                apps.add(m.group(1))
+            else:
+                m2 = re.search(r"/Applications/([^/]+)\.app/", line)
+                if m2:
+                    apps.add(m2.group(1))
+    except Exception:
+        pass
+
+    try:
+        res = subprocess.run(["lsappinfo", "list"], capture_output=True, text=True)
+        for line in res.stdout.splitlines():
+            if "bundle path=" in line:
+                m = re.search(r"/(?:Applications|System/Applications)/([^/]+)\.app", line)
+                if m:
+                    apps.add(m.group(1))
+            elif " ASN:" in line and "(hidden)" not in line:
+                m = re.search(r"\"([^\"]+)\"", line)
+                if m:
+                    apps.add(m.group(1))
+    except Exception:
+        pass
+
+    return apps
 
 
 def kill_app(app_name):
@@ -196,16 +228,11 @@ def check_and_restart_browsers(sites):
     """Checks if any browser has a blocked site open. If so, restarts that browser."""
     # Clean the domains for matching (e.g., 'youtube.com' from 'https://www.youtube.com/feed')
     domains = [s.replace("https://", "").replace("http://", "").split("/")[0].replace("www.", "") for s in sites]
-    browsers = ["Brave Browser", "Google Chrome", "Microsoft Edge", "Safari", "Vivaldi", "Arc"]
+    browsers = ["Brave Browser", "Google Chrome", "Microsoft Edge", "Safari", "Vivaldi", "Arc", "Firefox", "Tor Browser"]
+    running = get_running_apps()
 
     for browser in browsers:
-        # Check if the browser is actually running
-        check_running_script = f'tell application "System Events" to (name of processes) contains "{browser}"'
-        try:
-            res = subprocess.run(['osascript', '-e', check_running_script], capture_output=True, text=True, check=True)
-            if res.stdout.strip() != "true":
-                continue  # Browser isn't running, skip it
-        except subprocess.CalledProcessError:
+        if browser not in running:
             continue
 
         # Fetch all open tab URLs from the browser
@@ -231,12 +258,16 @@ def check_and_restart_browsers(sites):
             has_blocked_tab = any(d in all_urls for d in domains)
 
         except subprocess.CalledProcessError:
-            # If AppleScript fails (e.g., Arc's non-standard dictionary), assume false to be safe
-            has_blocked_tab = False
+            # If AppleScript fails (e.g., Arc's non-standard dictionary), assume true to be safe
+            has_blocked_tab = True
+
+        # Firefox & Tor Browser do not expose tab URLs via AppleScript; restart if running when site blocks apply
+        if browser in ["Firefox", "Tor Browser"]:
+            has_blocked_tab = True
 
         # If a blocked tab is found, quit and reopen that specific browser
         if has_blocked_tab:
-            print(f"  Blocked site found open in {browser}. Restarting it...")
+            print(f"  Blocked site check: Restarting {browser} to enforce site blocks...")
 
             quit_script = f'tell application "{browser}" to quit'
             subprocess.run(['osascript', '-e', quit_script], capture_output=True, text=True)
@@ -268,9 +299,10 @@ def run_daemon(end_time_str, apps_str, sites_str):
     while time.time() < end_time:
         running_apps = get_running_apps()
         for app in app_list:
-            if app in running_apps:
+            clean_app = app.replace(".app", "")
+            if app in running_apps or clean_app in running_apps:
                 kill_app(app)
-        time.sleep(0.2)  # Checks more frequently to kill the app instantly
+        time.sleep(0.5)  # Checks twice per second using lightweight lookup
 
     # Time's up: restore websites and clean up
     if site_list:
